@@ -1,56 +1,74 @@
 from flask import Flask, render_template, request
+import os
 
 app = Flask(__name__)
 
-@app.route("/", methods=["GET", "POST"])
+# 🔥 City price logic (realistic approx)
+def get_rate(city):
+    city = city.lower()
+
+    if "mumbai" in city:
+        return 12000
+    elif "delhi" in city:
+        return 8000
+    elif "bangalore" in city:
+        return 7000
+    elif "pune" in city:
+        return 6000
+    elif "lucknow" in city or "kanpur" in city:
+        return 3500
+    elif "kannauj" in city or "mainpuri" in city:
+        return 2500
+    else:
+        return 3000  # default
+
+
+@app.route("/")
+def welcome():
+    return render_template("welcome.html")
+
+
+@app.route("/home", methods=["GET", "POST"])
 def home():
     prediction = None
 
     if request.method == "POST":
         try:
-            area = float(request.form["area"])
-            bedrooms = int(request.form["bedrooms"])
-            age = int(request.form["age"])
+            area = float(request.form.get("area", 0))
+            bedrooms = int(request.form.get("bedrooms", 0))
+            age = int(request.form.get("age", 0))
+            city = request.form.get("city", "")
 
-            # 🔥 VALIDATION
-            if area <= 0:
-                prediction = "Area must be greater than 0 ❌"
+            # 🔥 VALIDATION (strong)
+            if area < 300 or area > 10000:
+                prediction = "Area must be between 300–10000 sqft ❌"
 
-            elif bedrooms <= 0:
-                prediction = "Bedrooms must be at least 1 ❌"
+            elif bedrooms < 1 or bedrooms > (area // 200):
+                prediction = "Invalid bedroom count for given area ❌"
 
-            elif bedrooms > (area / 200):
-                prediction = "Too many bedrooms for given area ❌"
+            elif age < 0 or age > 100:
+                prediction = "Invalid house age ❌"
 
-            elif age < 0:
-                prediction = "Age cannot be negative ❌"
-
-            elif age > 100:
-                prediction = "House too old ❌"
-
-            elif area < 300:
-                prediction = "Area too small ❌"
+            elif city.strip() == "":
+                prediction = "Please enter a city ❌"
 
             else:
-                # 🔥 REALISTIC PRICE CALCULATION
-                price = (area * 3000) + (bedrooms * 50000) - (age * 10000)
+                rate = get_rate(city)
 
-                # Minimum safeguard
-                if price < 500000:
-                    price = 500000
+                price = area * rate
+                price += bedrooms * 500000
+                price -= age * 10000
 
-                prediction = f"₹ {round(price):,}"
+                price = max(price, 500000)
+
+                prediction = f"{round(price / 100000, 2)} Lakhs"
 
         except:
-            prediction = "Invalid input, please enter correct values ❌"
+            prediction = "Invalid input ❌"
 
     return render_template("index.html", prediction=prediction)
 
 
-@app.route("/about")
-def about():
-    return render_template("about.html")
-
-
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=10000)
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host="0.0.0.0", port=port)
